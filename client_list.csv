@@ -1,0 +1,6 @@
+Client,Industry,Color,Address,longitude,latitude,state,revenue
+Sample Company A,Technology,Blue,"123 Main Street, New York, NY 10001",-74.0060,40.7128,New York,500000
+Sample Company B,Healthcare,Green,"456 Oak Avenue, Los Angeles, CA 90001",-118.2437,34.0522,California,750000
+Sample Company C,Restaurant,Orange,"789 Pine Road, Chicago, IL 60601",-87.6298,41.8781,Illinois,300000
+Sample Company D,Real Estate,Yellow,"321 Elm Street, Houston, TX 77001",-95.3698,29.7604,Texas,1000000
+Sample Company E,Retail,Purple,"654 Maple Drive, Phoenix, AZ 85001",-112.0740,33.4484,Arizona,450000

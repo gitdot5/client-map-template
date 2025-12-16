@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Client Map Visualization</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            margin: 0; 
+            padding: 0; 
+            font-family: "Montserrat", sans-serif !important;
+        }
+
+        #map { 
+            height: 100vh; 
+            width: 100%; 
+            font-family: "Montserrat", sans-serif !important;
+        }
+
+        .marker-div {
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .marker-div:hover {
+            transform: scale(1.3);
+            z-index: 999;
+        }
+
+        .toggler-filter {
+            position: absolute;
+            top: 20px;
+            left: 10px;
+            z-index: 2;
+            border: none;
+            padding:5px 5px 5px 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: left 0.5s;
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toggler-filter svg:last-child {
+            display: none;
+        }
+
+        .toggler-filter.open {
+            top:20px;
+            left:290px;
+        }
+
+        .toggler-filter.open svg:first-child {
+            display: none;
+        }
+
+        .toggler-filter.open svg:last-child {
+            display: block;
+        }
+
+        .filter-section {
+            position: absolute;
+            top: 10px;
+            left: -330px;
+            background: rgba(24, 24, 24, 0.75);
+            color:#fff;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1;
+            width: 300px;
+            transition: left 0.5s;
+        }
+
+        .filter-section.show {
+            left:10px;
+        }
+
+        .filter-section > div {
+            margin-bottom: 10px;
+            padding:2px 0px;
+        }
+
+        .filter-section .header {
+            font-weight: bold;
+            margin: 10px;
+        }
+
+        .filter-section .body {
+            overflow-y: auto;
+            display: grid !important;
+            grid-template-columns: 1fr 1fr;
+            gap:4px;
+        }
+
+        .group-div {
+            display: flex;
+            align-items: center;
+            padding: 10px 5px;
+            cursor: pointer;
+            color:#fff;
+            font-weight: 500;
+            position: relative;
+            box-shadow: 0px 0px 0.5rem #222;
+            border-radius: 2px;
+            overflow: hidden;
+            height: 40px;
+        }
+
+        .group-div > * {
+            z-index: 2;
+        }
+
+        .group-div:hover {
+            background-color: #e0e0e0;
+        }
+
+        .group-div input[type="checkbox"] {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            -webkit-transition: .4s;
+            transition: .4s;
+            z-index: 1;
+            border-radius: 0px !important;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            background-color: #3d3d3d;
+            color:#cdcdcd;
+        }
+
+        input:checked + .slider {
+            background-color: rgb(255, 255, 255);
+            color:black;
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px #3d3d3d;
+        }
+
+        .popup-content {
+            font-family: "Montserrat", sans-serif !important;
+        }
+
+        .popup-header {
+            border-bottom: 1px solid #ddd;
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .popup-item {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .popup-item .attr-label {
+            margin-right: 10px;
+            color:#000;
+            font-weight: 600;
+        }
+
+        #sector-filter {
+            font-size:14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="map-container">
+        <button class="toggler-filter open">
+             <svg width="20px" height="20px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"> <path d="M3 4H21L14 12V20L10 22V12L3 4Z" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path> </g></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 15 15" fill="#555" width="20" height="20"><path fill-rule="evenodd" clip-rule="evenodd" d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor"></path></svg>
+        </button>
+        <div class="filter-section show">
+            <div class="sector-filter">
+                <div class="header">Sector Filter</div>
+                <div class="body" id="sector-filter"></div>
+            </div>
+
+            <div class="state-filter" >
+                <div class="header">State Filter</div>
+                <div class="body" id="state-filter"></div>
+            </div>
+        </div>
+        <div id="map"></div>
+    </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" integrity="sha512-dfX5uYVXzyU8+KHqj8bjo7UkOdg18PaOtpa48djpNbZHwExddghZ+ZmzWT06R5v6NSk3ZUfsH6FNEDepLx9hPQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+    // ============================================
+    // CONFIGURATION - UPDATE THESE VALUES
+    // ============================================
+    
+    // Get your free Mapbox token at: https://account.mapbox.com/
+    mapboxgl.accessToken = 'YOUR_MAPBOX_ACCESS_TOKEN_HERE';
+    
+    // Map center coordinates [longitude, latitude]
+    const MAP_CENTER = { lng: -98.5795, lat: 39.8283 }; // Center of USA
+    
+    // Initial zoom level (lower = more zoomed out)
+    const INITIAL_ZOOM = 4;
+    
+    // ============================================
+    // END CONFIGURATION
+    // ============================================
+
+    const map = new mapboxgl.Map({
+        container: 'map',
+        style: 'mapbox://styles/mapbox/dark-v11',
+        config: {
+            basemap: {
+                theme: 'monochrome',
+                lightPreset: 'night'
+            }
+        },
+        maxZoom: 13,
+        minZoom: 2,
+        zoom: INITIAL_ZOOM,
+        pitch: 30,
+        center: MAP_CENTER
+    });
+
+    let states = [];
+    let selectedSectors = [], selectedStates = [];
+    let data = [], dataPolygons = {"type":"FeatureCollection", "features":[]};
+    let markers = [];
+    let sectors = [];
+
+    const popup = new mapboxgl.Popup({ focusAfterOpen:false, offset:[0, -12] });
+
+    map.on('load', () => {
+        map.addSource("states", {
+            type:"geojson",
+            data:"/target_states.geojson"
+        });
+
+        map.addLayer({
+            "id":"states",
+            "type":"fill", 
+            "source": "states",
+            "paint":{
+                "fill-outline-color":'limegreen',
+                "fill-color":"rgba(0,0,0,0.2)"
+            }
+        });
+
+        map.addLayer({
+            "id":"states-line",
+            "type":"line", 
+            "source": "states",
+            "paint":{
+                "line-width":0.75,
+                "line-color":'limegreen'
+            }
+        });
+
+        map.addSource("polygon-source", {
+            type:'geojson',
+            data:{"type":"FeatureCollection", "features":[]}
+        })
+
+        map.addLayer({
+            id:'polygon-layer',
+            source:'polygon-source',
+            type:'fill-extrusion',
+            minzoom:6.1,
+            paint:{
+                'fill-extrusion-color': ['get', 'Color'],
+                'fill-extrusion-height': ['get', 'height'],
+                'fill-extrusion-base': ['get', 'base_height'],
+                'fill-extrusion-opacity': 0.8
+            }
+        });
+
+        map.on("click", "polygon-layer", (e) => {
+            if(e.features.length) {
+                let feature = e.features[0];
+                createPopup({...feature.properties});
+            }
+        });
+
+        map.on("zoomend", (e) => {
+            let zoom = map.getZoom();
+            if(zoom > 6) {
+                markers.forEach(marker => marker.remove());
+            } else {
+                markers.forEach(marker => marker.addTo(map));
+            }
+        });
+
+        Papa.parse("client_list.csv", {
+            delimiter: ",",
+            header:true,
+            download: true,
+            complete: function(results) {
+                console.log(results);
+                data = results.data;
+                renderPolygons(results.data);
+
+                states = Array.from(new Set(data.map(item => item.state))).sort().filter(item => item);
+                sectors = Array.from(new Set(data.map(item => item['Industry']))).sort().filter(item => item);
+
+                selectedSectors = [...sectors];
+                selectedStates = [...states];
+
+                states.forEach(state => {
+                    createCheckbox(state, true);
+                });
+
+                sectors.forEach(sector => { 
+                    createCheckbox(sector, false);
+                });
+            }
+        });
+    });
+
+    function renderPolygons(data) {
+        let polygonFeatures = data.filter(entry => entry.Client).map(entry => {
+            const point = turf.point([parseFloat(entry.longitude), parseFloat(entry.latitude)]);
+            const buffered = turf.buffer(point, 1.5);
+            buffered.properties = {
+                ...entry,
+                base_height:0,
+                height:parseInt(entry.revenue)/200
+            };
+            return buffered
+        });
+
+        dataPolygons = {"type":"FeatureCollection", "features":[...polygonFeatures]};        
+        map.getSource("polygon-source").setData(dataPolygons);
+    }
+
+    function renderMarkers(data) {
+        data.forEach((item) => {
+            if (item.state) {
+                let sector = item.sector;
+                if (!sectors.includes(sector)) {
+                    sectors.push(sector);
+                }
+                let el = document.createElement('div');
+                el.className = 'marker-div';
+                el.style.backgroundColor = item.Color || getSectorColor(sector);
+                el.style.width = '16px';
+                el.style.height = '16px';
+
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    createPopup(item);
+                }
+
+                let marker = new mapboxgl.Marker(el)
+                    .setLngLat([parseFloat(item.longitude), parseFloat(item.latitude)])
+
+                marker.properties = {...item};
+                markers.push(marker);
+            }
+        });
+    }
+
+    function createPopup(item) {
+        popup.setHTML(
+            `<div class="popup-container">
+                <div class="popup-header">${item['Client']}</div>
+                <div class="popup-body">
+                    <div class="popup-item">
+                        <div class="attr-label">Industry</div>
+                        <div class="attr-val">${item['Industry']}</div>
+                    </div>
+                    <div class="popup-item">
+                        <div class="attr-label">Address</div>
+                        <div class="attr-val">${item['Address']}</div>
+                    </div>
+                </div>
+            </div>`
+        );
+        popup.setLngLat([parseFloat(item.longitude), parseFloat(item.latitude)]).addTo(map);
+    }
+
+    function getSectorColor(sector) {
+        // Default colors for unknown sectors
+        const colors = ['#FF5733', '#33FF57', '#3357FF', '#FF33F5', '#33FFF5', '#F5FF33'];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    function filterMarkers(e) {
+        let sectorCheckboxes = document.querySelectorAll('#sector-filter input[type="checkbox"]');
+        let stateCheckboxes = document.querySelectorAll('#state-filter input[type="checkbox"]');
+
+        let checkedSectors = Array.from(sectorCheckboxes).map(cb => ({id:cb.id, checked:cb.checked})).filter(entry => entry.checked).map(entry => entry.id);
+        let checkedStates = Array.from(stateCheckboxes).map(cb => ({id:cb.id, checked:cb.checked})).filter(entry => entry.checked).map(entry => entry.id);
+
+        selectedStates = checkedStates;
+        selectedSectors = checkedSectors;
+
+        markers.forEach(marker => marker.remove());
+        markers = [];
+
+        let ftsFilter = dataPolygons.features.filter(ft => {
+            let item = ft.properties;
+            return selectedStates.includes(item.state) && selectedSectors.includes(item['Industry'])
+        });
+
+        map.getSource("polygon-source").setData({"type":"FeatureCollection", "features":[...ftsFilter]});
+        renderMarkers(data.filter(item => 
+            selectedStates.includes(item.state) && 
+            selectedSectors.includes(item['Industry'])
+        ));
+    }
+
+    function createCheckbox(state, isState) {
+        let checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = state;
+        checkbox.checked = true;
+        checkbox.addEventListener('change', filterMarkers);
+
+        let label = document.createElement('label');
+        label.htmlFor = state;
+        label.className = 'group-div';
+
+        let sliderSpan = document.createElement('span');
+        sliderSpan.className = 'slider';
+        sliderSpan.textContent = state;
+
+        label.appendChild(checkbox);
+        label.appendChild(sliderSpan);
+
+        if(isState) {
+            document.getElementById('state-filter').appendChild(label);
+        } else {
+            document.getElementById('sector-filter').appendChild(label);
+        }
+    }
+
+    document.querySelector(".toggler-filter").onclick = (e) => {
+        document.querySelector(".filter-section").classList.toggle("show");
+        document.querySelector(".toggler-filter").classList.toggle("open");
+    }
+</script>
+
+</body>
+</html>
